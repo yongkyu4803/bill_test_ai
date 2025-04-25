@@ -1,9 +1,26 @@
 import streamlit as st
-import PyPDF2
-import openai
-import tempfile
-import os
 import time
+import os
+import tempfile
+
+# 필요한 패키지 설치 확인
+try:
+    import PyPDF2
+except ImportError:
+    st.warning("PyPDF2 패키지를 설치 중입니다...")
+    import subprocess
+    subprocess.check_call(["pip", "install", "PyPDF2"])
+    import PyPDF2
+    st.success("PyPDF2 패키지가 설치되었습니다.")
+
+try:
+    import openai
+except ImportError:
+    st.warning("openai 패키지를 설치 중입니다...")
+    import subprocess
+    subprocess.check_call(["pip", "install", "openai"])
+    import openai
+    st.success("openai 패키지가 설치되었습니다.")
 
 # 페이지 기본 설정
 st.set_page_config(
