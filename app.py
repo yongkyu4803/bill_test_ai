@@ -24,13 +24,13 @@ except ImportError:
 
 # 페이지 기본 설정
 st.set_page_config(
-    page_title="국회 회의록 분석기",
+    page_title="국회 회의록 분석기 v.1",
     page_icon="📚",
     layout="wide"
 )
 
 # 제목 및 설명
-st.title("📚 국회 회의록 분석 시스템")
+st.title("📚 국회 회의록 분석 시스템 v.1")
 st.markdown("""
 이 애플리케이션은 국회 회의록 PDF를 분석하여 주요 내용을 구조화된 형태로 요약해줍니다.
 """)
