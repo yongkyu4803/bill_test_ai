@@ -195,6 +195,92 @@ def analyze_minutes_with_openai(minutes_text):
         st.error(f"예상치 못한 오류가 발생했습니다: {e}")
         return None
 
+def split_text_into_chunks(text, max_chunk_size=10000, overlap=500):
+    """텍스트를 처리 가능한 크기의 청크로 분할합니다."""
+    if not text or len(text) <= max_chunk_size:
+        return [text]
+    
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = min(start + max_chunk_size, len(text))
+        
+        # 문장 또는 단락의 끝에서 분할하기 위한 시도
+        if end < len(text):
+            # 줄바꿈, 마침표, 물음표, 느낌표 등에서 분할
+            for split_char in ['\n\n', '\n', '. ', '? ', '! ', ' ']:
+                split_pos = text.rfind(split_char, start, end)
+                if split_pos != -1 and split_pos > start:
+                    end = split_pos + len(split_char)
+                    break
+        
+        chunk = text[start:end]
+        chunks.append(chunk)
+        
+        # 오버랩을 고려한 다음 시작 위치 (문맥 연속성 유지)
+        start = end - overlap if end - overlap > start else end
+    
+    return chunks
+
+def analyze_large_text_with_openai(minutes_text, prompt_template=None, progress_bar=None):
+    """대용량 텍스트를 분할하여 OpenAI API로 분석합니다."""
+    # 텍스트가 너무 짧으면 바로 처리
+    if len(minutes_text) < 12000:  # 약 3000 토큰
+        return analyze_minutes_with_openai(minutes_text)
+    
+    # 텍스트를 분할
+    chunks = split_text_into_chunks(minutes_text)
+    st.info(f"텍스트를 {len(chunks)}개의 청크로 분할했습니다.")
+    
+    # 각 청크별 분석 결과 저장
+    results = []
+    
+    # 프로그레스 바 설정
+    if progress_bar is None:
+        progress_bar = st.progress(0)
+        progress_text = st.empty()
+    
+    for i, chunk in enumerate(chunks):
+        # 프로그레스 업데이트
+        progress_value = (i + 1) / len(chunks)
+        progress_bar.progress(progress_value)
+        progress_text.text(f"청크 {i+1}/{len(chunks)} 분석 중... ({int(progress_value * 100)}%)")
+        
+        # 각 청크의 분석 결과
+        if i == 0:  # 첫 번째 청크는 전체 프롬프트 사용
+            chunk_result = analyze_minutes_with_openai(chunk)
+        else:  # 후속 청크는 이전 결과 확장을 위한 프롬프트 사용
+            continued_prompt = f"""
+이전 회의록 분석의 연속입니다. 새로운 정보를 기존 분석에 추가하세요.
+회의록의 추가 부분은 다음과 같습니다:
+
+{chunk}
+"""
+            chunk_result = analyze_minutes_with_openai(continued_prompt)
+        
+        if chunk_result:
+            results.append(chunk_result)
+    
+    # 결과 통합
+    if not results:
+        return None
+    
+    # 통합 요약 생성
+    combined_text = "\n\n".join(results)
+    
+    # 너무 길면 다시 요약
+    if len(combined_text) > 15000:
+        final_prompt = f"""
+여러 번에 걸쳐 분석된 회의록의 결과를 하나로 통합하세요.
+중복되는 내용은 제거하고, 모든 중요 정보를 유지하며 일관된 Markdown 형식으로 정리하세요.
+
+분석 결과:
+{combined_text}
+"""
+        return analyze_minutes_with_openai(final_prompt)
+    
+    return combined_text
+
 # 메인 애플리케이션 로직
 def main():
     if not st.session_state.OPENAI_API_KEY:
@@ -235,7 +321,7 @@ def main():
                         # 분석 시작 시간 기록
                         start_time = time.time()
                         
-                        summary = analyze_minutes_with_openai(minutes_text)
+                        summary = analyze_large_text_with_openai(minutes_text, None)
                         
                         # 분석 완료 시간 계산
                         end_time = time.time()
